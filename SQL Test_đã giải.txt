@@ -1,0 +1,44 @@
+WITH CTE_1 AS ( 
+SELECT DISTINCT
+        Cust_ID, 
+	CONTACT_DATE,
+        CASE
+        WHEN YEAR(STR_TO_DATE(CONTACT_DATE, "%d/%m/%Y"))=2023 THEN 'NTB'
+        ELSE 'ETB'
+        END AS Customer_type,
+        Month_ID,
+        Utilization_Rate
+FROM giai_de_sql_test.napfile
+WHERE Month_ID BETWEEN 202307 AND 202312 AND Utilization_Rate IS NOT NULL ),
+CTE_2 AS (
+    SELECT 
+        Cust_ID,
+        CONTACT_DATE,
+        Customer_type,
+        AVG(Utilization_Rate) AS Avg_Utilization_Rate,
+        COUNT(Utilization_Rate) AS Active_Months
+    FROM CTE_1
+    GROUP BY Cust_ID, CONTACT_DATE, Customer_type
+    )
+SELECT 
+    Cust_ID,
+    CONTACT_DATE,
+    Customer_type,
+    (SELECT Utilization_Rate FROM CTE_1 WHERE Cust_ID = fd.Cust_ID AND Month_ID = 202312 ) AS Utilization_Rate_202312,
+    (SELECT Utilization_Rate FROM CTE_1 WHERE Cust_ID = fd.Cust_ID AND Month_ID = 202311 ) AS Utilization_Rate_202311,
+    (SELECT Utilization_Rate FROM CTE_1 WHERE Cust_ID = fd.Cust_ID AND Month_ID = 202310 ) AS Utilization_Rate_202310,
+    (SELECT Utilization_Rate FROM CTE_1 WHERE Cust_ID = fd.Cust_ID AND Month_ID = 202309 ) AS Utilization_Rate_202309,
+    (SELECT Utilization_Rate FROM CTE_1 WHERE Cust_ID = fd.Cust_ID AND Month_ID = 202308 ) AS Utilization_Rate_202308,
+    (SELECT Utilization_Rate FROM CTE_1 WHERE Cust_ID = fd.Cust_ID AND Month_ID = 202307 ) AS Utilization_Rate_202307,
+    Avg_Utilization_Rate
+FROM CTE_2 AS fd
+WHERE Avg_Utilization_Rate < 50 
+AND Active_Months=6 -- Để lấy ra những khách hàng mà trong 6 tháng đó đều có tỷ lệ khai thác 
+  AND NOT EXISTS (
+      SELECT 1
+      FROM CTE_1 AS rd
+      WHERE fd.Cust_ID = rd.Cust_ID
+        AND rd.Utilization_Rate > 50
+        AND rd.Month_ID BETWEEN 202307 AND 202312
+  ) 
+ORDER BY Cust_ID;
